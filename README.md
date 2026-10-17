@@ -133,7 +133,7 @@ Usei IA (Claude, da Anthropic) como mentora. Ela preparou um kit de estudo com e
 
 Antes de publicar, pedi à IA apenas para remover os comentários de exercício do código. A publicação foi feita por mim.
 
-O kit de estudo, sem as soluções, para quem quiser fazer o mesmo caminho: [\[link do repositório do kit\]](https://github.com/fbguimaraes/kit-pix-por-dentro.git)
+O kit de estudo, sem as soluções, para quem quiser fazer o mesmo caminho: [kit-pix-por-dentro](https://github.com/fbguimaraes/kit-pix-por-dentro)
 
 ## Limites
 
