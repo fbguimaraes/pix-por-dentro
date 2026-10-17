@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pix por dentro</title>
+<style>
+  :root {
+    --bg: #f6f7f5; --card: #ffffff; --ink: #14201c; --muted: #5d6b66;
+    --line: #dde3e0; --accent: #0f7b6c; --accent-ink: #ffffff; --err: #b3261e;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1412; --card: #161e1b; --ink: #e6ece9; --muted: #93a39d;
+      --line: #26312d; --accent: #3cc2ad; --accent-ink: #06201b; --err: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+  header h1 { margin: 0; font-size: 1.9rem; letter-spacing: -0.02em; }
+  header p { margin: 4px 0 24px; color: var(--muted); }
+  .grid { display: grid; gap: 16px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 820px) { .grid { grid-template-columns: 1fr 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h2 { margin: 0 0 12px; font-size: 1.05rem; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  input, textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+                    background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { font-family: var(--mono); font-size: .85rem; resize: vertical; min-height: 96px; word-break: break-all; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button { margin-top: 16px; padding: 10px 16px; border: 0; border-radius: 10px; cursor: pointer;
+           background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); margin-left: 8px; }
+  .qr { display: flex; justify-content: center; background: #fff; border-radius: 12px; padding: 8px; margin-bottom: 12px; }
+  .qr svg { max-width: 100%; height: auto; }
+  .erro { color: var(--err); font-size: .9rem; min-height: 1.4em; margin-top: 8px; }
+  .campos { font-family: var(--mono); font-size: .85rem; line-height: 1.9; overflow-wrap: anywhere; }
+  .campos span { padding: 1px 3px; border-radius: 4px; }
+  .id { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  .tam { color: var(--muted); }
+  .hint { color: var(--muted); font-size: .85rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  td:first-child { color: var(--muted); width: 38%; }
+  footer { margin-top: 32px; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Pix por dentro</h1>
+    <p>Gerador de Pix copia e cola escrito do zero, seguindo os manuais do Banco Central.</p>
+  </header>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Gerar Pix estático</h2>
+      <form id="form-gerar">
+        <label for="chave">Chave Pix</label>
+        <input id="chave" name="chave" required placeholder="e-mail, +55DDDnúmero, CPF, CNPJ ou aleatória">
+        <div class="row">
+          <div><label for="nome">Nome do recebedor (até 25)</label><input id="nome" name="nome" required maxlength="40"></div>
+          <div><label for="cidade">Cidade (até 15)</label><input id="cidade" name="cidade" required maxlength="40"></div>
+        </div>
+        <div class="row">
+          <div><label for="valor">Valor (opcional)</label><input id="valor" name="valor" inputmode="decimal" placeholder="25.90"></div>
+          <div><label for="txid">Identificador (opcional)</label><input id="txid" name="txid" placeholder="PEDIDO123"></div>
+        </div>
+        <label for="info">Mensagem (opcional)</label>
+        <input id="info" name="info_adicional" maxlength="72">
+        <button type="submit">Gerar</button>
+        <div class="erro" id="erro-gerar" role="alert"></div>
+      </form>
+    </section>
+
+    <section class="card" id="resultado" hidden>
+      <h2>Resultado</h2>
+      <div class="qr" id="qr"></div>
+      <label for="copia">Pix copia e cola</label>
+      <textarea id="copia" readonly></textarea>
+      <button type="button" id="copiar">Copiar</button>
+      <h2 style="margin-top:20px">Anatomia</h2>
+      <p class="hint">ID · tamanho · valor. O 26 e o 62 têm campos dentro.</p>
+      <div class="campos" id="anatomia"></div>
+    </section>
+
+    <section class="card" hidden>
+      <h2>Ler um Pix copia e cola</h2>
+      <form id="form-ler">
+        <label for="colar">Cole aqui</label>
+        <textarea id="colar" required placeholder="000201..."></textarea>
+        <button type="submit">Decodificar</button>
+        <div class="erro" id="erro-ler" role="alert"></div>
+      </form>
+      <table id="tabela-lida" hidden></table>
+    </section>
+  </div>
+
+  <footer>Projeto de estudo. Teste com valores baixos e confira o nome do recebedor no app do banco antes de pagar.</footer>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function anatomia(payload) {
+  // Quebra só o nível raiz em TLV para desenhar a anatomia.
+  const out = [];
+  let i = 0;
+  while (i + 4 <= payload.length) {
+    const id = payload.slice(i, i + 2), tam = payload.slice(i + 2, i + 4);
+    const n = parseInt(tam, 10);
+    if (Number.isNaN(n)) break;
+    const valor = payload.slice(i + 4, i + 4 + n);
+    out.push(`<span class="id">${id}</span><span class="tam">${tam}</span>${escapar(valor)} `);
+    i += 4 + n;
+  }
+  return out.join("<br>");
+}
+
+function escapar(t) {
+  return t.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function mensagemDeErro(corpo) {
+  if (!corpo || !corpo.detail) return "Erro inesperado.";
+  if (typeof corpo.detail === "string") return corpo.detail;
+  return corpo.detail.map((d) => `${(d.loc || []).slice(-1)[0]}: ${d.msg}`).join(" · ");
+}
+
+$("form-gerar").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("erro-gerar").textContent = "";
+  const dados = Object.fromEntries(new FormData(ev.target));
+  for (const k of ["valor", "info_adicional"]) if (!dados[k]) delete dados[k];
+  if (!dados.txid) dados.txid = "***";
+  if (dados.valor) dados.valor = dados.valor.replace(",", ".");
+  const resp = await fetch("/api/pix", {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(dados),
+  });
+  const corpo = await resp.json().catch(() => null);
+  if (!resp.ok) { $("erro-gerar").textContent = mensagemDeErro(corpo); return; }
+  $("qr").innerHTML = corpo.qr_svg;
+  $("copia").value = corpo.payload;
+  $("anatomia").innerHTML = anatomia(corpo.payload);
+  $("resultado").hidden = false;
+});
+
+$("copiar").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("copia").value); $("copiar").textContent = "Copiado"; }
+  catch { $("copia").select(); }
+  setTimeout(() => ($("copiar").textContent = "Copiar"), 1500);
+});
+
+$("form-ler").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("erro-ler").textContent = "";
+  $("tabela-lida").hidden = true;
+  const resp = await fetch("/api/decodificar", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({payload: $("colar").value}),
+  });
+  const corpo = await resp.json().catch(() => null);
+  if (!resp.ok) { $("erro-ler").textContent = mensagemDeErro(corpo); return; }
+  const rotulos = {chave: "Chave", nome: "Nome", cidade: "Cidade", valor: "Valor", txid: "Identificador",
+                   info_adicional: "Mensagem", url: "URL (Pix dinâmico)", uso_unico: "Uso único"};
+  $("tabela-lida").innerHTML = Object.entries(rotulos)
+    .map(([k, r]) => {
+      const v = corpo[k] === true ? "sim" : corpo[k] === false ? "não" : (corpo[k] ?? "—");
+      return `<tr><td>${r}</td><td>${escapar(String(v))}</td></tr>`;
+    }).join("");
+  $("tabela-lida").hidden = false;
+});
+</script>
+</body>
+</html>
